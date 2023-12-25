@@ -52,39 +52,34 @@
             "internalConsoleOptions": "neverOpen"
         },
         {
-            "name": "Attach to Local Service",
-            "type": "node",
-            "request": "attach",
-            "port": 9239,
-            "restart": true,
-            "presentation": {
-                "group": "all",
-                "hidden": true
-            },
-            "internalConsoleOptions": "neverOpen"
+            "name": "Docker Node.js Launch",
+            "type": "docker",
+            "request": "launch",
+            "preLaunchTask": "docker-run: debug",
+            "platform": "node"
         }
     ],
     "compounds": [
         {
-            "name": "Debug (Edge)",
+            "name": "Debug in Docker (Edge)",
             "configurations": [
                 "Launch App (Edge)",
-                "Attach to Local Service"
+                "Docker Node.js Launch"
             ],
-            "preLaunchTask": "Start Teams App Locally",
+            "preLaunchTask": "Start application in Docker",
             "presentation": {
                 "group": "all",
-                "order": 1
+                "order": 2
             },
             "stopAll": true
         },
         {
-            "name": "Debug (Chrome)",
+            "name": "Debug in Docker (Chrome)",
             "configurations": [
                 "Launch App (Chrome)",
-                "Attach to Local Service"
+                "Docker Node.js Launch"
             ],
-            "preLaunchTask": "Start Teams App Locally",
+            "preLaunchTask": "Start application in Docker",
             "presentation": {
                 "group": "all",
                 "order": 2
