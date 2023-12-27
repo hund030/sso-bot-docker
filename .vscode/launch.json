@@ -52,6 +52,15 @@
             "internalConsoleOptions": "neverOpen"
         },
         {
+            "name": "Attach to Node",
+            "type": "node",
+            "request": "attach",
+            "port": 9229,
+            "address": "localhost",
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/usr/src/app"
+        },
+        {
             "name": "Docker Node.js Launch",
             "type": "docker",
             "request": "launch",
@@ -64,7 +73,7 @@
             "name": "Debug in Docker (Edge)",
             "configurations": [
                 "Launch App (Edge)",
-                "Docker Node.js Launch"
+                "Attach to Node"
             ],
             "preLaunchTask": "Start application in Docker",
             "presentation": {

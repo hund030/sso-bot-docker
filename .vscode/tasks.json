@@ -61,33 +61,25 @@
         },
         {
             "type": "docker-build",
-            "label": "docker-build",
+            "label": "docker-build: debug",
             "platform": "node",
             "dockerBuild": {
                 "dockerfile": "${workspaceFolder}/Dockerfile",
                 "context": "${workspaceFolder}",
-                "pull": true
+                "pull": true,
+                "target": "development"
             }
-        },
-        {
-            "type": "docker-run",
-            "label": "docker-run: release",
-            "dependsOn": [
-                "docker-build"
-            ],
-            "platform": "node"
         },
         {
             "type": "docker-run",
             "label": "docker-run: debug",
             "dependsOn": [
-                "docker-build"
+                "docker-build: debug"
             ],
             "dockerRun": {
-                "env": {
-                    "DEBUG": "*",
-                    "NODE_ENV": "development",
-                },
+                "envFiles": [
+                    "${workspaceFolder}/.localConfigs"
+                ],
                 "ports": [
                     {
                         "hostPort": 3978,
@@ -95,11 +87,12 @@
                     },
                     {
                         "hostPort": 9239,
-                        "containerPort": 9239
+                        "containerPort": 9229
                     }
                 ],
+                "remove": true
             },
-            "node": {}
+            "node": { }
         }
     ]
 }
