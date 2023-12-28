@@ -82,23 +82,43 @@ provision:
       appPackagePath: ./appPackage/build/appPackage.${{TEAMSFX_ENV}}.zip
 
 deploy:
-  # Run npm command
-  - uses: cli/runNpmCommand
+  - uses: script
+    name: set environment variables
     with:
-      args: install
-  - uses: cli/runNpmCommand
+      run: echo "::set-teamsfx-env CONTAINER_IMAGE=sso-bot:latest";
+        echo "::set-teamsfx-env AZURE_CONTAINER_IMAGE=${{AZURE_CONTAINER_APP_NAME}}.azurecr.io/${{CONTAINER_IMAGE}}"
+
+  - uses: script
+    name: build container image
     with:
-      args: run build --if-present
-  # Deploy your application to Azure App Service using the zip deploy feature.
-  # For additional details, refer to https://aka.ms/zip-deploy-to-app-services.
-  - uses: azureAppService/zipDeploy
+      run: docker build -t ${{CONTAINER_IMAGE}} .
+
+  - uses: script
+    name: tag container image
     with:
-      # Deploy base folder
-      artifactFolder: .
-      # Ignore file location, leave blank will ignore nothing
-      ignoreFile: .webappignore
-      # The resource id of the cloud resource to be deployed to
-      resourceId: ${{BOT_AZURE_APP_SERVICE_RESOURCE_ID}}
+      run: docker tag ${{CONTAINER_IMAGE}} ${{AZURE_CONTAINER_IMAGE}}
+
+  - uses: script
+    name: login azure container registry
+    with:
+      run: az acr login -n ${{AZURE_CONTAINER_APP_NAME}}
+
+  - uses: script
+    name: push container image
+    with:
+      run: docker push ${{AZURE_CONTAINER_IMAGE}}
+
+  - uses: script
+    name: deploy container image
+    with:
+      run: az containerapp up -n ${{AZURE_CONTAINER_APP_NAME}} --image ${{AZURE_CONTAINER_IMAGE}}
+        --env-vars "BOT_ID=secretref:bot-id"
+        "BOT_PASSWORD=secretref:bot-password"
+        "BOT_DOMAIN=${{BOT_DOMAIN}}"
+        "AAD_APP_CLIENT_ID=${{AAD_APP_CLIENT_ID}}"
+        "AAD_APP_CLIENT_SECRET=${{SECRET_AAD_APP_CLIENT_SECRET}}"
+        "AAD_APP_TENANT_ID=${{AAD_APP_TENANT_ID}}"
+        "AAD_APP_OAUTH_AUTHORITY_HOST=${{AAD_APP_OAUTH_AUTHORITY_HOST}}"
 
 publish:
   # Validate using manifest schema

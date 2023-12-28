@@ -78,6 +78,12 @@ server.post("/api/messages", async (req, res) => {
 });
 
 server.get(
+  "/health", async (req, res) => {
+    res.send(200);
+  }
+)
+
+server.get(
   "/auth-:name(start|end).html",
   restify.plugins.serveStatic({
     directory: path.join(__dirname, "public"),

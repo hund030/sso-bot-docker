@@ -10,72 +10,137 @@ param botAadAppClientId string
 @description('Required by Bot Framework package in your bot project')
 param botAadAppClientSecret string
 
-param webAppSKU string
-
 @maxLength(42)
 param botDisplayName string
 
-param serverfarmsName string = resourceBaseName
-param webAppName string = resourceBaseName
-param location string = resourceGroup().location
+@description('Required by SSO flow')
 param aadAppClientId string
 param aadAppTenantId string
 param aadAppOauthAuthorityHost string
 @secure()
 param aadAppClientSecret string
 
-// Compute resources for your Web App
-resource serverfarm 'Microsoft.Web/serverfarms@2021-02-01' = {
-  kind: 'app'
-  location: location
-  name: serverfarmsName
-  sku: {
-    name: webAppSKU
+@description('Specifies the docker container image to deploy.')
+param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
+@description('Minimum number of replicas that will be deployed')
+@minValue(0)
+@maxValue(25)
+param minReplica int = 1
+
+@description('Maximum number of replicas that will be deployed')
+@minValue(0)
+@maxValue(25)
+param maxReplica int = 3
+
+var location = resourceGroup().location
+// https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#acrpull
+var acrPullRole = resourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+
+module acr 'containerRegistry.bicep' = {
+  name: 'acr'
+  params: {
+    containerRegistryName: resourceBaseName
   }
 }
 
-// Web App that hosts your bot
-resource webApp 'Microsoft.Web/sites@2021-02-01' = {
-  kind: 'app'
+@description('This module seeds the ACR with the public version of the app')
+module acrImportImage 'br/public:deployment-scripts/import-acr:3.0.1' =  {
+  name: 'importContainerImage'
+  params: {
+    acrName: acr.outputs.name
+    location: location
+    images: array(containerImage)
+  }
+}
+
+resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
+  name: resourceBaseName
   location: location
-  name: webAppName
+  properties: {}
+}
+
+resource uai 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${resourceBaseName}'
+  location: location
+}
+
+@description('This allows the managed identity of the container app to access the registry, note scope is applied to the wider ResourceGroup not the ACR')
+resource uaiRbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, uai.id, acrPullRole)
   properties: {
-    serverFarmId: serverfarm.id
-    httpsOnly: true
-    siteConfig: {
-      alwaysOn: true
-      appSettings: [
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~18' // Set NodeJS version to 18.x for your site
-        }
-        {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
-        }
-        {
-          name: 'RUNNING_ON_AZURE'
-          value: '1'
-        }
-      ]
-      ftpsState: 'FtpsOnly'
+    roleDefinitionId: acrPullRole
+    principalId: uai.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
+  name: resourceBaseName
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${uai.id}': {}
     }
   }
-}
-
-resource webAppSettings 'Microsoft.Web/sites/config@2021-02-01' = {
-  name: '${webAppName}/appsettings'
   properties: {
-    WEBSITE_NODE_DEFAULT_VERSION: '~18'
-    WEBSITE_RUN_FROM_PACKAGE: '1'
-    BOT_ID: botAadAppClientId
-    BOT_PASSWORD: botAadAppClientSecret
-    BOT_DOMAIN: webApp.properties.defaultHostName
-    AAD_APP_CLIENT_ID: aadAppClientId
-    AAD_APP_CLIENT_SECRET: aadAppClientSecret
-    AAD_APP_TENANT_ID: aadAppTenantId
-    AAD_APP_OAUTH_AUTHORITY_HOST: aadAppOauthAuthorityHost
-    RUNNING_ON_AZURE: '1'
+    managedEnvironmentId: containerAppEnv.id
+    configuration: {
+      secrets: [
+        {
+          name: 'bot-id'
+          value: botAadAppClientId
+        }
+        {
+          name: 'bot-password'
+          value: botAadAppClientSecret
+        }
+      ]
+      ingress: {
+        external: true
+        targetPort: 80
+        allowInsecure: false
+        traffic: [
+          {
+            latestRevision: true
+            weight: 100
+          }
+        ]
+      }
+      registries: [
+        {
+          identity: uai.id
+          server: acr.outputs.loginServer
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: resourceBaseName
+          image: acrImportImage.outputs.importedImages[0].acrHostedImage
+          resources: {
+            cpu: json('.25')
+            memory: '.5Gi'
+          }
+        }
+      ]
+      scale: {
+        minReplicas: minReplica
+        maxReplicas: maxReplica
+        rules: [
+          {
+            name: 'http-requests'
+            http: {
+              metadata: {
+                concurrentRequests: '10'
+              }
+            }
+          }
+        ]
+      }
+    }
   }
 }
 
@@ -85,11 +150,11 @@ module azureBotRegistration './botRegistration/azurebot.bicep' = {
   params: {
     resourceBaseName: resourceBaseName
     botAadAppClientId: botAadAppClientId
-    botAppDomain: webApp.properties.defaultHostName
+    botAppDomain: containerApp.properties.configuration.ingress.fqdn
     botDisplayName: botDisplayName
   }
 }
 
-// The output will be persisted in .env.{envName}. Visit https://aka.ms/teamsfx-actions/arm-deploy for more details.
-output BOT_AZURE_APP_SERVICE_RESOURCE_ID string = webApp.id
-output BOT_DOMAIN string = webApp.properties.defaultHostName
+output AZURE_CONTAINER_APP_NAME string = containerApp.name
+output AZURE_CONTAINER_APPFQDN string = containerApp.properties.configuration.ingress.fqdn
+output BOT_DOMAIN string = containerApp.properties.configuration.ingress.fqdn

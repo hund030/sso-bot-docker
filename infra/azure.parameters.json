@@ -11,9 +11,6 @@
     "botAadAppClientSecret": {
       "value": "${{SECRET_BOT_PASSWORD}}"
     },
-    "webAppSKU": {
-      "value": "B1"
-    },
     "botDisplayName": {
       "value": "bot-sso"
     },
