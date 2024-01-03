@@ -14,9 +14,6 @@ param botAadAppClientSecret string
 param botDisplayName string
 
 @description('Required by SSO flow')
-param aadAppClientId string
-param aadAppTenantId string
-param aadAppOauthAuthorityHost string
 @secure()
 param aadAppClientSecret string
 
@@ -89,12 +86,12 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     configuration: {
       secrets: [
         {
-          name: 'bot-id'
-          value: botAadAppClientId
-        }
-        {
           name: 'bot-password'
           value: botAadAppClientSecret
+        }
+        {
+          name: 'aad-app-client-secret'
+          value: aadAppClientSecret
         }
       ]
       ingress: {

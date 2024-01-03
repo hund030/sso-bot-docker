@@ -14,7 +14,7 @@ import {
   TurnContext,
 } from "botbuilder";
 import "isomorphic-fetch";
-import { TeamsBotSsoPrompt } from "@microsoft/teamsfx";
+import { TeamsBotSsoPrompt, setLogger, setLogLevel, LogLevel } from "@microsoft/teamsfx";
 import oboAuthConfig from "./authConfig";
 import config from "./config";
 import { SSOCommandMap } from "./commands/SSOCommandMap";
@@ -32,6 +32,13 @@ export class SSODialog extends ComponentDialog {
   // In this sample the provider is shared in all conversations
   constructor(dedupStorage: Storage) {
     super(DIALOG_NAME);
+    setLogger({
+      verbose: console.log,
+      info: console.info,
+      warn: console.warn,
+      error: console.error,
+    });
+    setLogLevel(LogLevel.Error);
 
     const initialLoginEndpoint = `https://${config.botDomain}/auth-start.html`;
 
