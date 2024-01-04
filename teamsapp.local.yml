@@ -2,7 +2,7 @@
 version: v1.2
 
 additionalMetadata:
-  sampleTag: TeamsFx-Samples:bot-sso
+  sampleTag: TeamsFx-Samples:sso-bot-docker
 
 provision:
   - uses: aadApp/create # Creates a new Azure Active Directory (AAD) app to authenticate users if the environment variable that stores clientId is empty
